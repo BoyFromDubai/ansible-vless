@@ -1,0 +1,38 @@
+- name: Download foo.conf
+  vars:
+    dir: /tmp
+    xray_zip_name: Xray-linux-64.zip
+    archive_file_path: "{{ tmp_dir }}/{{ xray_zip_name }}"
+  block:
+    - name: Update cache and install "zip" package
+      become: true
+      ansible.builtin.apt:
+        name: zip
+        update_cache: yes
+    - name: Download xray-core
+      ansible.builtin.get_url:
+        url: https://github.com/XTLS/Xray-core/releases/download/v1.8.9/Xray-linux-64.zip
+        dest: "{{ archive_file_path }}"
+        mode: '0400'
+      register: xray_downloaded
+    - name: Create xray root dir
+      become: true
+      ansible.builtin.file:
+        path: "{{ root_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0700'
+    - name: Unarchive xray-core
+      become: true
+      ansible.builtin.unarchive:
+        src: "{{ archive_file_path }}"
+        dest: "{{ xray_bin_dir }}"
+        remote_src: yes
+      when: xray_downloaded.changed
+
+- name: Download RealiTLScanner
+  ansible.builtin.get_url:
+    url: https://github.com/XTLS/RealiTLScanner/releases/download/v0.2.1/RealiTLScanner-linux-64
+    dest: "{{ tmp_dir }}/RealiTLScanner-linux-64"
+    mode: '0500'

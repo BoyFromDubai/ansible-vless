@@ -1,0 +1,18 @@
+- name: Install dependencies
+  ansible.builtin.include_tasks: download-dependencies.yaml
+- name: Create configuration file
+  ansible.builtin.include_tasks: configure-xray.yaml
+- name: Start service
+  ansible.builtin.include_tasks: start-xray-service.yaml
+
+
+- name: Conn
+  debug:
+    msg: "{{ clients_uuids }}"
+- name: Conn
+  loop: "{{ clients_uuids | dict2items }}"
+  debug:
+    msg: >-
+      CLIENT: {{ item.key }}
+
+      CONN_URL: vless://{{ item.value }}@{{ ansible_default_ipv4['address'] }}:{{listen_port}}/?encryption=none&type=tcp&sni={{ mask_domain }}&alpn=h2&fp=chrome&flow=xtls-rprx-vision&security=reality&pbk={{ pub_key }}&packetEncoding=xudp#MyVlessServer

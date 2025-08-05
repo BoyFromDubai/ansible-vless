@@ -1,0 +1,21 @@
+- name: Create service
+  become: true
+  vars:
+    systemd_dir: /usr/lib/systemd/system
+    xray_service_file_path: "{{ systemd_dir }}/{{ service_name }}.service"
+  ansible.builtin.template:
+    src: xray.service.j2
+    dest: "{{ xray_service_file_path }}"
+    mode: '0640'
+  notify:
+    - "[[ RELOAD ]] systemd"
+    - "[[ RESTART ]] {{ service_name }}"
+
+- name: Start XRAY service
+  become: true
+  ansible.builtin.service:
+    name: "{{ service_name }}"
+    state: started
+    enabled: yes
+
+  

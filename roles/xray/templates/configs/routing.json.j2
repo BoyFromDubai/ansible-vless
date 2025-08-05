@@ -1,0 +1,26 @@
+{
+  "routing": {
+    "rules": [
+      {
+        "type": "field",
+        "protocol": "bittorrent",
+        "outboundTag": "block"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "metrics_in"
+        ],
+        "outboundTag": "metrics_out"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "api"
+        ],
+        "outboundTag": "api"
+      }
+    ],
+    "domainStrategy": "IPIfNonMatch"
+  }
+}

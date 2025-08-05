@@ -1,0 +1,119 @@
+
+- name: Create clients
+  vars:
+    inbounds_conf: "{{ configs_dir }}/inbounds.json"
+  block:
+    - name: Load existing UUIDs file if exists
+      slurp:
+        src: "{{ inbounds_conf }}"
+      register: existing_clients
+      ignore_errors: true
+    
+    - name: Set existing UUIDs as fact from xray config JSON
+      set_fact:
+        clients_uuids: >-
+          {{ 
+            clients_uuids 
+            | default({})
+            | combine({ item.email: item.id }) 
+            | dict2items
+            | selectattr('key', 'in', clients | map(attribute='name') | list)
+            | items2dict
+          }}
+      loop: >-
+        {{
+          (
+            existing_clients.content
+            | b64decode
+            | from_json
+          ).inbounds[0].settings.clients
+        }}
+      when: existing_clients is defined and not existing_clients.failed
+
+    - name: Initialize UUIDs dict if file was empty or missing
+      set_fact:
+        clients_uuids: {}
+      when: clients_uuids is not defined
+
+    - name: Find out if there are any difference between existing clients and new ones
+      set_fact:
+        new_clients_added: "{{ clients | map(attribute='name') | difference(clients_uuids.keys()) | length != 0 }}"
+    - name: A
+      debug:
+        msg: "{{ new_clients_added }}"
+
+    - name: Create new clients
+      block:
+        - name: Generate UUIDs for new clients only
+          command: "{{ xray_bin_path }} uuid"
+          register: new_uuid
+          loop: "{{ clients }}"
+          loop_control:
+            label: "{{ item.name }}"
+          when: clients_uuids[item.name] is not defined
+          changed_when: false
+          tags: generate
+
+        - name: Merge new UUIDs into clients_uuids
+          set_fact:
+            clients_uuids: "{{ clients_uuids | combine({ item.item.name: item.stdout }, recursive=True) }}"
+          loop: "{{ new_uuid.results }}"
+          when: item.skipped is not defined or not item.skipped
+          tags: merge
+
+      when: new_clients_added
+
+- name: Create keys
+  vars:
+    keys_filename: xray-keys.yaml
+    keys_file_path: "{{ ansible_user_dir }}/{{ keys_filename }}"
+  block:
+    - name: Generate new keys 
+      shell: "{{ xray_bin_path }} x25519 > {{ keys_file_path }}"
+      args:
+        chdir: "{{ ansible_user_dir }}"
+        creates: "{{ keys_filename }}"
+    
+    - name: Load existing keys
+      slurp:
+        src: "{{ keys_file_path }}"
+      register: xray_keys
+
+    - name: Set existing keys obj as fact
+      set_fact:
+        existing_xray_keys: "{{ xray_keys['content'] | b64decode | from_yaml }}"
+
+    - name: Set keys as fact
+      set_fact:
+        priv_key: "{{ existing_xray_keys['Private key'] }}"
+        pub_key: "{{ existing_xray_keys['Public key'] }}"
+
+- name: Create logs directory
+  file:
+    path: "{{ configs_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Create configs directory
+  become: true
+  file:
+    path: "{{ logs_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Create xray config files
+  template:
+    src: "{{ item }}"
+    dest: "{{ configs_dir }}/{{ item | basename | regex_replace('\\.j2$', '') }}"
+  loop:
+    - configs/api.json.j2
+    - configs/inbounds.json.j2
+    - configs/metrics.json.j2
+    - configs/outbounds.json.j2
+    - configs/policy.json.j2
+    - configs/routing.json.j2
+    - configs/log.json.j2
+    - configs/stats.json.j2
+
+    
+  # "{{ configs_dir }}"

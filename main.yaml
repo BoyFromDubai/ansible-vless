@@ -1,0 +1,4 @@
+- name: Configure vpn
+  hosts: vpn
+  roles:
+    - xray
